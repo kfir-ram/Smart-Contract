@@ -17,7 +17,7 @@ try:
     # Deployed contract address (see `migrate` command output: `contract address`)
     deployed_contract_address = '0x4462D1eDc59E529aF9b8fa7D56c4c429BeA0cbf9'
 
-    with open('SplitAssets.json') as file:
+    with open('node_modules/.bin/build/contracts/SplitAssets.json') as file:
         contract_json = json.load(file)  # load contract info as JSON
         # fetch contract's abi - necessary to call its functions
         contract_abi = contract_json['abi']
@@ -25,7 +25,7 @@ try:
     contract = web3.eth.contract(address=deployed_contract_address, abi=contract_abi)
 except:
     print("aa")
-    easygui.msgbox("Error found:\n" + str(sys.exc_info()[0]), title="Connecting Error to the Blockchain")
+    easygui.msgbox("Error:\n" + str(sys.exc_info()[0]), title="Connecting Error to the Blockchain")
     exit(0)
 
 create_list = [
@@ -96,7 +96,7 @@ table_list = [
 layout = [[Sg.Column(create_list)],
           [Sg.Column(buy_list)],
           [Sg.Column(sell_list)],
-          #[Sg.Menu(menu_def)],
+          # [Sg.Menu(menu_def)],
           [Sg.T('Table of the products:')],
           [Sg.In(key='inputRow', justification='right', size=(8, 1), pad=(1, 1), do_not_clear=True),
            Sg.In(key='inputCol', size=(8, 1), pad=(1, 1), justification='right', do_not_clear=True),
@@ -111,6 +111,7 @@ for i in range(20):
 form = Sg.FlexForm('Table', return_keyboard_events=True, grab_anywhere=False)
 form.Layout(layout)
 """
+
 
 # validate for the input, flag: 0 - Create, 1 = Buy, 2= Sell
 def validate(args, flag):
@@ -134,11 +135,17 @@ def create_assets(name, value, max_owners, keep_percent):
 
 
 def buy_asset(percent):
-    contract.
+    contract.functions.buyAsset(int(percent)).transact()
+    assetInfo = contract.functions.getInfo().call()
+    Sg.popup_quick_message("You've bought " + str(percent) + "% of the asset: " + str(assetInfo[0]) + " successfully.",
+                           no_titlebar=True)
 
 
 def sell_asset(percent):
-    pass
+    contract.functions.sellAsset(int(percent)).transact()
+    assetInfo = contract.functions.getInfo().call()
+    Sg.popup_quick_message("You've sold " + str(percent) + "% of the asset: " + str(assetInfo[0]) + " successfully.",
+                           no_titlebar=True)
 
 
 # Create the Window
