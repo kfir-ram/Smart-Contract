@@ -8,6 +8,7 @@ import easygui
 
 Sg.theme('DarkAmber')
 
+# this is to connect the block chain, you need to change the 'with open(LOCATION OF SPLIT_ASSETS.JSON)'
 try:
     blockchain_address = 'http://127.0.0.1:9545'
     # Client instance to interact with the blockchain
@@ -47,7 +48,7 @@ buy_list = [
         Sg.Button("Buy"),
         Sg.Text('Percent: '),
         Sg.InputText(key="buy_percent", size=(15, 1)),
-        Sg.Text('0/100')
+        Sg.Text('0/100', key="percent_to_buy")
     ]
 ]
 
@@ -56,52 +57,25 @@ sell_list = [
         Sg.Button("Sell"),
         Sg.Text('Percent: '),
         Sg.InputText(key="sell_percent", size=(15, 1)),
-        Sg.Text('0/0')
+        Sg.Text('0/0', key="percent_to_sell")
+    ]
+]
+
+asset_info = [
+    [
+        Sg.Text("Asset info:\nNone", key="asset_text", size=(800, 11)),
     ]
 ]
 
 # --------------------------------------------------------
 # Table
-# create dataframe to simulate database with names and dates
-"""
-data = {'Name':  ['Joe Smith', 'Jason Leary','Bill Murray'],
-        'Start Date': ['2019/10/01', '2019/11/01','2019/12/01'],
-        'End Date': ['2019/10/15', '2019/11/15','2019/12/15']
-        }
-df = pd.DataFrame (data, columns = ['Name','Start Date','End Date'])
-Data_Table = df.to_string()
 
-
-header_list = [str(x) for x in range(len(data[0]))]
-table_list = [
-    [
-        sg.Table(values=Data_Table, max_col_width=25, background_color='cyan', auto_size_columns=True, justification='right', alternating_row_color='blue', key='_table_', headings = header_list)
-    ]
-]
-"""
-
-"""
-menu_def = [['Name', ['carWash', 'sopermercado']],
-            ['City', ['Beer-Sheva', 'Tel-Aviv']],
-            ['Price', ['1.5M', '2.3M']
-
-             ]]
-"""
-table_list = [
-    [
-
-    ]
-]
 # All the stuff inside your window.
 layout = [[Sg.Column(create_list)],
           [Sg.Column(buy_list)],
           [Sg.Column(sell_list)],
-          # [Sg.Menu(menu_def)],
-          [Sg.T('Table of the products:')],
-          [Sg.In(key='inputRow', justification='right', size=(8, 1), pad=(1, 1), do_not_clear=True),
-           Sg.In(key='inputCol', size=(8, 1), pad=(1, 1), justification='right', do_not_clear=True),
-           Sg.In(key='current_value', size=(8, 1), pad=(1, 1), justification='right', do_not_clear=True)],
-          [Sg.Button('Ok'), Sg.Button('Cancel')]]
+          [Sg.Column(asset_info)],
+          ]
 """
 for i in range(20):
     inputs = [Sg.In(size=(18, 1), pad=(1, 1), justification='right', key=(i, j), do_not_clear=True) for j in range(10)]
@@ -127,37 +101,56 @@ def validate(args, flag):
     return False
 
 
-def create_assets(name, value, max_owners, keep_percent):
+def create_asset(name, value, max_owners, keep_percent):
     contract.functions.uploadAsset(name, int(value), int(max_owners), int(keep_percent)).transact()
-    print("\n-----------------\n")
-    message = contract.functions.printAsset().call()
-    print(message)
+    update_asset()
 
 
 def buy_asset(percent):
-    contract.functions.buyAsset(int(percent)).transact()
+    contract.functions.buyShares(int(percent)).transact()
     assetInfo = contract.functions.getInfo().call()
     Sg.popup_quick_message("You've bought " + str(percent) + "% of the asset: " + str(assetInfo[0]) + " successfully.",
                            no_titlebar=True)
 
 
 def sell_asset(percent):
-    contract.functions.sellAsset(int(percent)).transact()
+    contract.functions.sellShares(int(percent)).transact()
     assetInfo = contract.functions.getInfo().call()
     Sg.popup_quick_message("You've sold " + str(percent) + "% of the asset: " + str(assetInfo[0]) + " successfully.",
                            no_titlebar=True)
 
 
+def update_asset():
+    message = contract.functions.assetInfo().call()
+    if message[0] != ",":
+        args = message.split(",")
+        name = args[0]
+        value = int(args[1])
+        numOfOwners = int(args[2])
+        maxOwners = args[3]
+        percent = args[4].split("-")
+        left_percent = args[5]
+        table_info = "Asset Name: " + name + "\tAsset Value: " + str(value) + "\tNumber of Owners: " + str(numOfOwners) + "/" + maxOwners +"\n-----------------------------------------------------------\n"
+        table_info += "Index\tAsset Percent\tAsset Value\n"
+        for i in range(numOfOwners):
+            table_info += str(i+1) + ".\t" + percent[i] + "%\t\t" + str(float(value*float(percent[i])/100)) + "\t" + "\n"
+
+        window.find_element('asset_text').update(table_info)
+        window.find_element('percent_to_buy').update("0/" + left_percent)
+
+
 # Create the Window
-window = Sg.Window('Window Title', layout)
+window = Sg.Window('Window Title', layout, size=(900, 320))
 # Event Loop to process "events" and get the "values" of the inputs
 while True:
+    window.finalize()
+    update_asset()
     event, values = window.read()
-    if event == Sg.WIN_CLOSED or event == 'Cancel':  # if user closes window or clicks cancel
+    if event == Sg.WIN_CLOSED:  # if user closes window or clicks cancel
         break
     elif event == 'Create':
         if validate(values, 0):
-            create_assets(values['name'], values['value'], values['max_owners'], values['keep_percent'])
+            create_asset(values['name'], values['value'], values['max_owners'], values['keep_percent'])
         else:
             Sg.popup_quick_message("Please Enter all of the fields to CREATE an asset", title="Input Error",
                                    location=window.current_location())
@@ -173,4 +166,5 @@ while True:
         else:
             Sg.popup_quick_message("Please Enter a valid percent to SELL an asset", title="Input Error",
                                    location=window.current_location())
+
 window.close()
